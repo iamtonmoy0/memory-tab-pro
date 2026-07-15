@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MemoryTab PRO</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app">
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <span class="logo"> <img src="../../icons/logo.png"  style="border-radius: 50%; height: 40px" />  </span>
+            <span class="logo-text">MemoryTab <span class="pro-badge">PRO</span></span>
+        </div>
+        <div class="header-right">
+            <button id="darkModeToggle" class="dark-toggle" title="Toggle dark mode">
+                <span id="darkIcon">🌙</span>
+            </button>
+            <span id="pageCount" class="stats-badge">0 pages</span>
+        </div>
+    </header>
+
+    <!-- Search -->
+    <div id="search-container" class="search-container">
+        <div class="search-wrapper">
+            <span class="search-icon">🔍</span>
+            <input
+                    type="text"
+                    id="searchInput"
+                    placeholder="Search your memory..."
+                    class="search-input"
+            />
+        </div>
+        <div class="search-hints">
+            <span class="hint">Try: "docker networking video"</span>
+            <span class="hint">"go concurrency article"</span>
+            <span class="hint">"that blue website"</span>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab active" data-tab="search">
+            <span>🔍</span> Search
+        </button>
+        <button class="tab" data-tab="timeline">
+            <span>⏱️</span> Timeline
+        </button>
+        <button class="tab" data-tab="settings">
+            <span>⚙️</span> Settings
+        </button>
+    </div>
+
+    <!-- Content -->
+    <div id="content" class="content">
+        <!-- Search View -->
+        <div id="searchView" class="view active">
+            <div id="statsSection"></div>
+            <div id="pageList"></div>
+        </div>
+
+        <!-- Timeline View -->
+        <div id="timelineView" class="view" style="display:none;">
+            <div id="timelineList"></div>
+        </div>
+
+        <!-- Settings View -->
+        <div id="settingsView" class="view" style="display:none;">
+            <div id="settingsContent"></div>
+        </div>
+    </div>
+
+    <!-- Page Detail Modal -->
+    <div id="detailModal" class="modal" style="display:none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">✕</button>
+            <div id="detailContent"></div>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="popup.js"></script>
+</body>
+</html>
