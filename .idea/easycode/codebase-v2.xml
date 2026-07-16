@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="com.obiscr.chatgpt.settings.EasyCodeState">
+    <option name="projectFiles" value="$PROJECT_DIR$/src/background/background.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/content/content.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/popup/components/PageDetail.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/popup/components/PageList.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/popup/components/SearchBar.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/popup/components/Settings.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/popup/components/stats.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/popup/components/Timeline.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/popup/index.html;C:/Users/lab5051/Desktop/memory-tab-pro/src/popup/popup.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/popup/style.css;C:/Users/lab5051/Desktop/memory-tab-pro/src/services/ai.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/services/chrome.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/services/storage.js;C:/Users/lab5051/Desktop/memory-tab-pro/src/utils/helpers.js;C:/Users/lab5051/Desktop/memory-tab-pro/jsconfig.json;C:/Users/lab5051/Desktop/memory-tab-pro/manifest.json" />
+  </component>
+</project>

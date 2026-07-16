@@ -1,6 +1,4 @@
-// src/background/background.js - No ES module imports
 
-// ===== Storage Service (inline, no imports) =====
 class StorageService {
     constructor() {
         this.db = null;

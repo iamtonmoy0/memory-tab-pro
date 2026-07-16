@@ -585,7 +585,3 @@ body {
     font-size: 14px;
 }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width: 420px) {
-    body { width: 100%; }
-}
