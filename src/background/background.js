@@ -244,5 +244,3 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 });
-
-console.log('MemoryTab background service worker started');
