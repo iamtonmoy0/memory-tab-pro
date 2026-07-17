@@ -11,8 +11,7 @@
     "webNavigation",
     "scripting",
     "idle",
-    "alarms",
-    "unlimitedStorage"
+    "alarms"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {

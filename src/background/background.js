@@ -10,7 +10,6 @@ class StorageService {
     async init() {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, this.version);
-
             request.onupgradeneeded = (e) => {
                 const db = e.target.result;
                 if (!db.objectStoreNames.contains(this.storeName)) {
@@ -20,15 +19,11 @@ class StorageService {
                     store.createIndex('title', 'title', { unique: false });
                 }
             };
-
             request.onsuccess = (e) => {
                 this.db = e.target.result;
                 resolve(this.db);
             };
-
-            request.onerror = (e) => {
-                reject(e.target.error);
-            };
+            request.onerror = (e) => reject(e.target.error);
         });
     }
 
@@ -37,7 +32,6 @@ class StorageService {
         const id = `${page.url}_${Date.now()}`;
         const tx = this.db.transaction(this.storeName, 'readwrite');
         const store = tx.objectStore(this.storeName);
-
         return new Promise((resolve, reject) => {
             const req = store.put({ ...page, id, visitedAt: page.visitedAt || Date.now() });
             req.onsuccess = () => resolve(id);
@@ -50,11 +44,9 @@ class StorageService {
         const tx = this.db.transaction(this.storeName, 'readonly');
         const store = tx.objectStore(this.storeName);
         const index = store.index('visitedAt');
-
         return new Promise((resolve, reject) => {
             const results = [];
             const req = index.openCursor(null, 'prev');
-
             req.onsuccess = (e) => {
                 const cursor = e.target.result;
                 if (cursor && results.length < limit) {
@@ -64,7 +56,6 @@ class StorageService {
                     resolve(results);
                 }
             };
-
             req.onerror = () => reject(req.error);
         });
     }
@@ -73,7 +64,6 @@ class StorageService {
         if (!this.db) await this.init();
         const all = await this.getRecentPages(200);
         const lower = query.toLowerCase();
-
         return all.filter(p =>
             p.title.toLowerCase().includes(lower) ||
             (p.text && p.text.toLowerCase().includes(lower)) ||
@@ -85,7 +75,6 @@ class StorageService {
         if (!this.db) await this.init();
         const tx = this.db.transaction(this.storeName, 'readonly');
         const store = tx.objectStore(this.storeName);
-
         return new Promise((resolve, reject) => {
             const req = store.get(id);
             req.onsuccess = () => resolve(req.result);
@@ -97,7 +86,6 @@ class StorageService {
         if (!this.db) await this.init();
         const tx = this.db.transaction(this.storeName, 'readonly');
         const store = tx.objectStore(this.storeName);
-
         return new Promise((resolve, reject) => {
             const req = store.getAll();
             req.onsuccess = () => resolve(req.result);
@@ -109,7 +97,6 @@ class StorageService {
         if (!this.db) await this.init();
         const tx = this.db.transaction(this.storeName, 'readwrite');
         const store = tx.objectStore(this.storeName);
-
         return new Promise((resolve, reject) => {
             const req = store.clear();
             req.onsuccess = () => resolve();
@@ -121,7 +108,6 @@ class StorageService {
         if (!this.db) await this.init();
         const tx = this.db.transaction(this.storeName, 'readwrite');
         const store = tx.objectStore(this.storeName);
-
         return new Promise((resolve, reject) => {
             const req = store.delete(id);
             req.onsuccess = () => resolve();
@@ -205,7 +191,6 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
 
         await storage.addPage(page);
         console.log('Page saved:', tab.title);
-
     } catch (e) {
         console.error('Error saving page:', e);
     }
@@ -244,3 +229,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 });
+

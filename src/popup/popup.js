@@ -1,3 +1,7 @@
+// src/popup/popup.js
+import { StorageService } from '../services/storage.js';
+import { formatTimeAgo, formatDate, extractDomain } from '../utils/helpers.js';
+
 // ===== Dark Mode =====
 let darkModeEnabled = false;
 
@@ -25,23 +29,8 @@ function applyDarkMode(enabled) {
 async function toggleDarkMode() {
     darkModeEnabled = !darkModeEnabled;
     applyDarkMode(darkModeEnabled);
-    // Save preference
     chrome.storage.local.set({ darkMode: darkModeEnabled });
 }
-
-// ... in your initialization, after DOM is ready:
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadDarkModePreference();
-    // ... rest of your init
-});
-
-// Add event listener for the toggle button
-document.getElementById('darkModeToggle')?.addEventListener('click', toggleDarkMode);
-
-
-// src/popup/popup.js
-import { StorageService } from '../services/storage.js';
-import { formatTimeAgo, formatDate, extractDomain } from '../utils/helpers.js';
 
 // ===== State =====
 const state = {
@@ -139,7 +128,6 @@ function renderPageList(pages) {
 
     pageList.innerHTML = html;
 
-    // Click handler
     pageList.querySelectorAll('.page-item').forEach(el => {
         el.addEventListener('click', () => {
             const id = el.dataset.id;
@@ -160,7 +148,6 @@ function renderTimeline(pages) {
         return;
     }
 
-    // Group by date
     const groups = {};
     pages.forEach(p => {
         const date = new Date(p.visitedAt).toDateString();
@@ -318,7 +305,7 @@ function renderSettings() {
 
 function openDetail(page) {
     const domain = extractDomain(page.url);
-    const tags = page.tags || ['Go', 'Concurrency', 'Worker Pool']; // Mock tags for demo
+    const tags = page.tags || ['Go', 'Concurrency', 'Worker Pool'];
 
     detailContent.innerHTML = `
     <div class="detail-title">${page.title || 'Untitled'}</div>
@@ -341,7 +328,6 @@ function openDetail(page) {
 
     detailModal.style.display = 'block';
 
-    // Actions
     detailContent.querySelector('#detailOpen')?.addEventListener('click', () => {
         if (page.url) chrome.tabs.create({ url: page.url });
         closeDetail();
@@ -370,17 +356,14 @@ function closeDetail() {
 function switchTab(tabName) {
     state.currentView = tabName;
 
-    // Update tab buttons
     document.querySelectorAll('.tab').forEach(t => {
         t.classList.toggle('active', t.dataset.tab === tabName);
     });
 
-    // Update views
     document.querySelectorAll('.view').forEach(v => {
         v.style.display = v.id === `${tabName}View` ? 'block' : 'none';
     });
 
-    // Refresh content
     if (tabName === 'search') renderSearch();
     else if (tabName === 'timeline') renderTimeline(state.pages);
     else if (tabName === 'settings') renderSettings();
@@ -418,6 +401,7 @@ async function handleSearch(query) {
         return;
     }
 
+    // Simple keyword search (no AI)
     const results = await storage.searchPages(query);
     state.filteredPages = results;
     renderSearch();
@@ -425,23 +409,21 @@ async function handleSearch(query) {
 
 // ===== Event Listeners =====
 
-// Search
 searchInput.addEventListener('input', (e) => {
     handleSearch(e.target.value);
 });
 
-// Tabs
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
         switchTab(tab.dataset.tab);
     });
 });
 
-// Modal close
 modalClose.addEventListener('click', closeDetail);
 detailModal.querySelector('.modal-overlay')?.addEventListener('click', closeDetail);
 
-// Keyboard shortcuts
+document.getElementById('darkModeToggle')?.addEventListener('click', toggleDarkMode);
+
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeDetail();
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -450,7 +432,6 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Search hints
 document.querySelectorAll('.hint').forEach(hint => {
     hint.addEventListener('click', () => {
         searchInput.value = hint.textContent.trim();
@@ -460,15 +441,17 @@ document.querySelectorAll('.hint').forEach(hint => {
 
 // ===== Init =====
 
-await storage.init();
-await loadData();
+(async function init() {
+    await storage.init();
+    await loadDarkModePreference();
+    await loadData();
 
-// If no pages, load mock data for demo
-if (state.pages.length === 0) {
-    loadMockData();
-}
+    if (state.pages.length === 0) {
+        await loadMockData();
+    }
+})();
 
-// ===== Mock Data (for demo) =====
+// ===== Mock Data =====
 
 async function loadMockData() {
     const mockPages = [
