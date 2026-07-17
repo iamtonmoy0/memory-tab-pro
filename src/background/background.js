@@ -1,4 +1,10 @@
 
+import { initModel, generateEmbedding } from '../services/ai.js';
+
+// ===== Initialize AI model on startup =====
+initModel();
+
+// ===== Storage class (inline for background) =====
 class StorageService {
     constructor() {
         this.db = null;
@@ -38,8 +44,11 @@ class StorageService {
         const tx = this.db.transaction(this.storeName, 'readwrite');
         const store = tx.objectStore(this.storeName);
 
+        // Convert Float32Array to Array for storage if embedding exists
+        const embedding = page.embedding ? Array.from(page.embedding) : null;
+
         return new Promise((resolve, reject) => {
-            const req = store.put({ ...page, id, visitedAt: page.visitedAt || Date.now() });
+            const req = store.put({ ...page, id, visitedAt: page.visitedAt || Date.now(), embedding });
             req.onsuccess = () => resolve(id);
             req.onerror = () => reject(req.error);
         });
@@ -58,7 +67,9 @@ class StorageService {
             req.onsuccess = (e) => {
                 const cursor = e.target.result;
                 if (cursor && results.length < limit) {
-                    results.push(cursor.value);
+                    // Strip embedding for performance
+                    const { embedding, ...page } = cursor.value;
+                    results.push(page);
                     cursor.continue();
                 } else {
                     resolve(results);
@@ -88,7 +99,13 @@ class StorageService {
 
         return new Promise((resolve, reject) => {
             const req = store.get(id);
-            req.onsuccess = () => resolve(req.result);
+            req.onsuccess = () => {
+                const page = req.result;
+                if (page && page.embedding) {
+                    page.embedding = new Float32Array(page.embedding);
+                }
+                resolve(page);
+            };
             req.onerror = () => reject(req.error);
         });
     }
@@ -100,7 +117,13 @@ class StorageService {
 
         return new Promise((resolve, reject) => {
             const req = store.getAll();
-            req.onsuccess = () => resolve(req.result);
+            req.onsuccess = () => {
+                const pages = req.result;
+                pages.forEach(p => {
+                    if (p.embedding) p.embedding = new Float32Array(p.embedding);
+                });
+                resolve(pages);
+            };
             req.onerror = () => reject(req.error);
         });
     }
@@ -126,6 +149,63 @@ class StorageService {
             const req = store.delete(id);
             req.onsuccess = () => resolve();
             req.onerror = () => reject(req.error);
+        });
+    }
+
+    // ===== AI methods =====
+    async getPagesWithEmbeddings(limit = 200) {
+        if (!this.db) await this.init();
+        const tx = this.db.transaction(this.storeName, 'readonly');
+        const store = tx.objectStore(this.storeName);
+        const index = store.index('visitedAt');
+
+        return new Promise((resolve, reject) => {
+            const results = [];
+            const req = index.openCursor(null, 'prev');
+            req.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor && results.length < limit) {
+                    const page = cursor.value;
+                    if (page.embedding && page.embedding.length > 0) {
+                        results.push({
+                            ...page,
+                            embedding: new Float32Array(page.embedding)
+                        });
+                    }
+                    cursor.continue();
+                } else {
+                    resolve(results);
+                }
+            };
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    cosineSimilarity(a, b) {
+        if (a.length !== b.length) return 0;
+        let dot = 0, normA = 0, normB = 0;
+        for (let i = 0; i < a.length; i++) {
+            dot += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+        if (normA === 0 || normB === 0) return 0;
+        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    async findSimilarPages(queryEmbedding, limit = 10) {
+        const pages = await this.getPagesWithEmbeddings(200);
+        if (pages.length === 0) return [];
+
+        const scored = pages.map(p => ({
+            ...p,
+            score: this.cosineSimilarity(queryEmbedding, p.embedding)
+        }));
+
+        scored.sort((a, b) => b.score - a.score);
+        return scored.slice(0, limit).map(p => {
+            const { embedding, ...rest } = p;
+            return rest;
         });
     }
 }
@@ -192,6 +272,16 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             console.log('Content extraction skipped');
         }
 
+        // === Generate embedding (AI) ===
+        let embedding = null;
+        if (content && content.length > 50) {
+            try {
+                embedding = await generateEmbedding(content.substring(0, 1000));
+            } catch (e) {
+                console.warn('Embedding generation failed:', e);
+            }
+        }
+
         const page = {
             url: tab.url,
             title: tab.title || 'Untitled',
@@ -201,10 +291,11 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             domain: extractDomain(tab.url),
             tags: await generateTags(tab.title, content),
             summary: await generateSummary(tab.title, content),
+            embedding: embedding, // Float32Array or null
         };
 
         await storage.addPage(page);
-        console.log('Page saved:', tab.title);
+        console.log('Page saved with embedding:', tab.title);
 
     } catch (e) {
         console.error('Error saving page:', e);
@@ -242,5 +333,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else if (message.action === 'clearData') {
         storage.clearAll().then(() => sendResponse({ success: true }));
         return true;
+    } else if (message.action === 'semanticSearch') {
+        // Semantic search using AI embeddings
+        (async () => {
+            const query = message.query;
+            if (!query || !query.trim()) {
+                sendResponse({ pages: [] });
+                return;
+            }
+            try {
+                // Generate embedding for the query
+                const queryEmbedding = await generateEmbedding(query);
+                const results = await storage.findSimilarPages(queryEmbedding, 15);
+                sendResponse({ pages: results });
+            } catch (e) {
+                console.error('Semantic search failed:', e);
+                // Fallback to keyword search
+                const keywordResults = await storage.searchPages(query);
+                sendResponse({ pages: keywordResults });
+            }
+        })();
+        return true; // Keep channel open for async response
     }
 });

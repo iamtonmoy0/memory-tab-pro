@@ -1,3 +1,7 @@
+// src/popup/popup.js
+import { StorageService } from '../services/storage.js';
+import { formatTimeAgo, formatDate, extractDomain } from '../utils/helpers.js';
+
 // ===== Dark Mode =====
 let darkModeEnabled = false;
 
@@ -25,23 +29,24 @@ function applyDarkMode(enabled) {
 async function toggleDarkMode() {
     darkModeEnabled = !darkModeEnabled;
     applyDarkMode(darkModeEnabled);
-    // Save preference
     chrome.storage.local.set({ darkMode: darkModeEnabled });
 }
 
-// ... in your initialization, after DOM is ready:
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadDarkModePreference();
-    // ... rest of your init
-});
+// ===== Semantic Search Preference =====
+let useSemanticSearch = true; // default
 
-// Add event listener for the toggle button
-document.getElementById('darkModeToggle')?.addEventListener('click', toggleDarkMode);
+async function loadSemanticSearchPreference() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['semanticSearch'], (result) => {
+            useSemanticSearch = result.semanticSearch !== undefined ? result.semanticSearch : true;
+            resolve();
+        });
+    });
+}
 
-
-// src/popup/popup.js
-import { StorageService } from '../services/storage.js';
-import { formatTimeAgo, formatDate, extractDomain } from '../utils/helpers.js';
+function saveSemanticSearchPreference(value) {
+    chrome.storage.local.set({ semanticSearch: value });
+}
 
 // ===== State =====
 const state = {
@@ -139,7 +144,6 @@ function renderPageList(pages) {
 
     pageList.innerHTML = html;
 
-    // Click handler
     pageList.querySelectorAll('.page-item').forEach(el => {
         el.addEventListener('click', () => {
             const id = el.dataset.id;
@@ -160,7 +164,6 @@ function renderTimeline(pages) {
         return;
     }
 
-    // Group by date
     const groups = {};
     pages.forEach(p => {
         const date = new Date(p.visitedAt).toDateString();
@@ -239,6 +242,19 @@ function renderSettings() {
     </div>
 
     <div class="settings-section">
+      <div class="settings-section-title">🧠 AI Search</div>
+      <div class="settings-item">
+        <div>
+          <div class="settings-item-label">Semantic Search</div>
+          <div class="settings-item-desc">Find pages by meaning, not just keywords</div>
+        </div>
+        <div class="toggle ${useSemanticSearch ? 'active' : ''}" id="semanticToggle">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-section-title">🎨 Appearance</div>
       <div class="settings-item">
         <div>
@@ -281,12 +297,23 @@ function renderSettings() {
     </div>
   `;
 
-    // Toggle handlers
+    // Toggle handlers for regular toggles
     settingsContent.querySelectorAll('.toggle').forEach(el => {
         el.addEventListener('click', () => {
             el.classList.toggle('active');
         });
     });
+
+    // Semantic toggle specific
+    const semanticToggle = settingsContent.querySelector('#semanticToggle');
+    if (semanticToggle) {
+        semanticToggle.addEventListener('click', () => {
+            semanticToggle.classList.toggle('active');
+            useSemanticSearch = semanticToggle.classList.contains('active');
+            saveSemanticSearchPreference(useSemanticSearch);
+            console.log('Semantic search:', useSemanticSearch ? 'ON' : 'OFF');
+        });
+    }
 
     // Export
     settingsContent.querySelector('#exportBtn')?.addEventListener('click', async () => {
@@ -318,7 +345,7 @@ function renderSettings() {
 
 function openDetail(page) {
     const domain = extractDomain(page.url);
-    const tags = page.tags || ['Go', 'Concurrency', 'Worker Pool']; // Mock tags for demo
+    const tags = page.tags || ['Go', 'Concurrency', 'Worker Pool'];
 
     detailContent.innerHTML = `
     <div class="detail-title">${page.title || 'Untitled'}</div>
@@ -341,7 +368,6 @@ function openDetail(page) {
 
     detailModal.style.display = 'block';
 
-    // Actions
     detailContent.querySelector('#detailOpen')?.addEventListener('click', () => {
         if (page.url) chrome.tabs.create({ url: page.url });
         closeDetail();
@@ -370,17 +396,14 @@ function closeDetail() {
 function switchTab(tabName) {
     state.currentView = tabName;
 
-    // Update tab buttons
     document.querySelectorAll('.tab').forEach(t => {
         t.classList.toggle('active', t.dataset.tab === tabName);
     });
 
-    // Update views
     document.querySelectorAll('.view').forEach(v => {
         v.style.display = v.id === `${tabName}View` ? 'block' : 'none';
     });
 
-    // Refresh content
     if (tabName === 'search') renderSearch();
     else if (tabName === 'timeline') renderTimeline(state.pages);
     else if (tabName === 'settings') renderSettings();
@@ -418,30 +441,47 @@ async function handleSearch(query) {
         return;
     }
 
-    const results = await storage.searchPages(query);
-    state.filteredPages = results;
-    renderSearch();
+    try {
+        let results;
+        if (useSemanticSearch) {
+            // Use semantic search via background
+            const response = await chrome.runtime.sendMessage({
+                action: 'semanticSearch',
+                query: query.trim()
+            });
+            results = response.pages || [];
+        } else {
+            // Fallback to keyword search
+            results = await storage.searchPages(query);
+        }
+        state.filteredPages = results;
+        renderSearch();
+    } catch (e) {
+        console.error('Search failed:', e);
+        // Fallback to keyword search
+        const results = await storage.searchPages(query);
+        state.filteredPages = results;
+        renderSearch();
+    }
 }
 
 // ===== Event Listeners =====
 
-// Search
 searchInput.addEventListener('input', (e) => {
     handleSearch(e.target.value);
 });
 
-// Tabs
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
         switchTab(tab.dataset.tab);
     });
 });
 
-// Modal close
 modalClose.addEventListener('click', closeDetail);
 detailModal.querySelector('.modal-overlay')?.addEventListener('click', closeDetail);
 
-// Keyboard shortcuts
+document.getElementById('darkModeToggle')?.addEventListener('click', toggleDarkMode);
+
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeDetail();
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -450,7 +490,6 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Search hints
 document.querySelectorAll('.hint').forEach(hint => {
     hint.addEventListener('click', () => {
         searchInput.value = hint.textContent.trim();
@@ -460,15 +499,18 @@ document.querySelectorAll('.hint').forEach(hint => {
 
 // ===== Init =====
 
-await storage.init();
-await loadData();
+(async function init() {
+    await storage.init();
+    await loadDarkModePreference();
+    await loadSemanticSearchPreference();
+    await loadData();
 
-// If no pages, load mock data for demo
-if (state.pages.length === 0) {
-    loadMockData();
-}
+    if (state.pages.length === 0) {
+        await loadMockData();
+    }
+})();
 
-// ===== Mock Data (for demo) =====
+// ===== Mock Data =====
 
 async function loadMockData() {
     const mockPages = [
