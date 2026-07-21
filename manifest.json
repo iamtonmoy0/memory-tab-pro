@@ -7,10 +7,8 @@
     "tabs",
     "activeTab",
     "storage",
-    "history",
     "webNavigation",
     "scripting",
-    "idle",
     "alarms"
   ],
   "host_permissions": ["<all_urls>"],
